@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # PostgreSQL - قاعدة البيانات الرئيسية
+  postgres:
+    image: postgres:15-alpine
+    container_name: whalex_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: whalex
+      POSTGRES_PASSWORD: whalex_2026_secure
+      POSTGRES_DB: whalex_prime
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whalex"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - whalex_network
+
+  # Redis - Pub/Sub و Cache
+  redis:
+    image: redis:7-alpine
+    container_name: whalex_redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass whalex_redis_2026
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - whalex_network
+
+  # Backend API + WebSocket
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: whalex_backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://whalex:whalex_2026_secure@postgres:5432/whalex_prime
+      REDIS_URL: redis://:whalex_redis_2026@redis:6379
+      SECRET_KEY: ${SECRET_KEY:-whalex_super_secret_key_change_in_production}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-whalex2026admin}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    networks:
+      - whalex_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Nginx - Serve Frontend + Proxy API
+  nginx:
+    image: nginx:alpine
+    container_name: whalex_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+    networks:
+      - whalex_network
+
+networks:
+  whalex_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
