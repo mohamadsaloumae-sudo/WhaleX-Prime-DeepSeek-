@@ -1,0 +1,26 @@
+"""Signal Model"""
+from datetime import datetime
+from sqlalchemy import String, DateTime, Integer, Float
+from sqlalchemy.orm import Mapped, mapped_column
+from app.core.database import Base
+
+
+class Signal(Base):
+    __tablename__ = "signals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    radar_type: Mapped[str] = mapped_column(String(20))  # futures, spot, meme
+    symbol: Mapped[str] = mapped_column(String(20), index=True)
+    direction: Mapped[str] = mapped_column(String(10))  # LONG, SHORT
+    grade: Mapped[str] = mapped_column(String(1))  # S, A, B, C
+    score: Mapped[float] = mapped_column(Float)
+    confidence: Mapped[float] = mapped_column(Float)
+    entry: Mapped[float] = mapped_column(Float)
+    sl: Mapped[float] = mapped_column(Float)
+    tp1: Mapped[float] = mapped_column(Float)
+    tp2: Mapped[float] = mapped_column(Float)
+    tp3: Mapped[float] = mapped_column(Float)
+    leverage: Mapped[float] = mapped_column(Float)
+    strategies: Mapped[str] = mapped_column(String(500))
+    tier: Mapped[str] = mapped_column(String(10), default="B")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
