@@ -1,0 +1,56 @@
+name: Deploy WhaleX Prime
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      
+      - name: Run tests
+        run: |
+          cd backend
+          pytest tests/ -v
+      
+      - name: Lint with flake8
+        run: |
+          cd backend
+          flake8 app/ --count --max-complexity=10 --statistics
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy to Plesk (Hunters Germany)
+        env:
+          PLESK_HOST: ${{ secrets.PLESK_HOST }}
+          PLESK_USER: ${{ secrets.PLESK_USER }}
+          PLESK_PASSWORD: ${{ secrets.PLESK_PASSWORD }}
+        run: |
+          sshpass -p "$PLESK_PASSWORD" ssh -o StrictHostKeyChecking=no $PLESK_USER@$PLESK_HOST '
+            cd /var/www/whalex-prime
+            git pull origin main
+            docker-compose down
+            docker-compose up -d --build
+            docker-compose exec backend alembic upgrade head
+          
